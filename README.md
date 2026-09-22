@@ -21,16 +21,6 @@ opencode plugin add @omnilium/opencode-dcp@latest
 
 This installs the package and adds it to your global OpenCode config.
 
-## Related Project
-
-[Sleev](https://sleev.ai) is a local proxy for coding agents, including Claude Code, Codex, and OpenCode. It provides
-context management through the `sleev` CLI:
-
-```bash
-npm i -g sleev
-sleev
-```
-
 ## How It Works
 
 DCP reduces context size through a compress tool and automatic cleanup. Your session history is never modified — DCP
