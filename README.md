@@ -191,6 +191,14 @@ changes.
 
 </details>
 
+### Notifications
+
+DCP reports compression and pruning results according to `pruneNotification` (`off`, `minimal`, or `detailed`).
+
+On OpenCode V2, notifications appear as TUI toasts. V2 has no equivalent of V1's model-invisible chat message, so both
+`pruneNotificationType` values (`chat` and `toast`) render as a toast and the setting has no effect. Toasts require the
+DCP TUI plugin, so headless runs (`opencode run`) receive no on-screen notification.
+
 ### Commands
 
 DCP provides a TUI panel and one prompt-producing slash command:

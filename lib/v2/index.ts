@@ -33,11 +33,14 @@ import { createLanguageStripHook } from "./language-strip"
 import { analyzeContextTokens } from "../commands/context"
 import { buildStatsReport } from "../commands/stats"
 import { rpc } from "./rpc"
+import { buildToastEvent, type NotifyEvent, type ToastBody } from "./notify"
 
-// Extension point for future model-invisible V2 reports. Never use synthetic()
-// here: its text would enter the model's context, unlike V1 ignored messages.
+// V1 delivered notifications as model-invisible "ignored" chat messages. V2 has
+// no such concept: the shim below logs text here and pushes it to the TUI plugin
+// over the notify RPC event. Never use synthetic() as a substitute: its text
+// would enter the model's context.
 export async function report(logger: Logger, text: string, sessionID?: string) {
-    logger.debug("V2 report (display pending)", { sessionID, text })
+    logger.debug("V2 report", { sessionID, text })
 }
 
 export async function setup(ctx: Plugin.Context) {
@@ -49,6 +52,9 @@ export async function setup(ctx: Plugin.Context) {
         },
     }
     const config = getConfig({ directory: ctx.location.directory, client: warnings })
+    // V2 has no model-invisible chat message, so prune/compress notifications must
+    // render as TUI toasts; the "chat" notification type is unavailable here.
+    config.pruneNotificationType = "toast"
     if (!config.enabled) {
         await ctx.rpc.register(
             { ...rpc, methods: { status: rpc.methods.status } },
@@ -66,6 +72,7 @@ export async function setup(ctx: Plugin.Context) {
     const sessions = new Map<string, SessionState>()
     const queues = new Map<string, Promise<unknown>>()
     const limits = new Map<string, number>()
+    let notify: (event: NotifyEvent) => void = () => {}
     const aliases: Record<string, string> = {
         task: "subagent",
         bash: "shell",
@@ -111,8 +118,10 @@ export async function setup(ctx: Plugin.Context) {
                 report(logger, input.body.parts.map((part) => part.text).join("\n"), input.path.id),
         },
         tui: {
-            showToast: async (input: { body: { message: string } }) =>
-                report(logger, input.body.message),
+            showToast: async (input: { body: ToastBody }) => {
+                report(logger, input.body.message)
+                notify(buildToastEvent(input.body))
+            },
         },
     }
 
@@ -338,7 +347,7 @@ export async function setup(ctx: Plugin.Context) {
                     },
                 })
         })
-    await ctx.rpc.register(rpc, {
+    const registration = await ctx.rpc.register(rpc, {
         status: async () => ({ enabled: config.commands.enabled }),
         snapshot: ({ sessionID }) =>
             serial(sessionID, async () => {
@@ -367,9 +376,17 @@ export async function setup(ctx: Plugin.Context) {
                 return {}
             }),
     })
+    notify = (event) => {
+        void registration.events.emit("notify", event).catch((error: unknown) =>
+            logger.error("Failed to emit V2 notification", {
+                error: error instanceof Error ? error.message : String(error),
+            }),
+        )
+    }
     logger.info("DCP V2 initialized")
     return () => {
         sessions.clear()
         limits.clear()
+        void registration.dispose()
     }
 }

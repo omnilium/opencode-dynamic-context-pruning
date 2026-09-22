@@ -1,4 +1,5 @@
 import { tool } from "@opencode-ai/plugin"
+import { NOTIFY_VARIANTS } from "./notify"
 
 const z = tool.schema
 const session = z.object({ sessionID: z.string() })
@@ -44,5 +45,16 @@ export const rpc = {
         },
         manual: { input: session.extend({ enabled: z.boolean() }), output: z.object({}) },
     },
-    events: {},
+    events: {
+        // Model-invisible display channel: V2 has no equivalent of V1's ignored
+        // chat messages, so the server plugin pushes notifications to the TUI plugin here.
+        notify: {
+            schema: z.object({
+                title: z.string(),
+                message: z.string(),
+                variant: z.enum(NOTIFY_VARIANTS),
+                duration: z.number(),
+            }),
+        },
+    },
 } as const

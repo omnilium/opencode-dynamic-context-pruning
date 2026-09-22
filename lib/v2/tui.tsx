@@ -9,6 +9,16 @@ export async function setup(ctx: Plugin.Context) {
     const client = ctx.client.rpc(rpc)
     const options = () => ({ location: ctx.location ?? ctx.data.location.default() })
     if (!(await client.status({}, options())).enabled) return
+    // V2 has no model-invisible chat message, so the server plugin pushes
+    // compression and pruning notifications over this event instead.
+    const stopNotify = client.events.on("notify", (event) => {
+        ctx.ui.toast.show({
+            title: event.data.title,
+            message: event.data.message,
+            variant: event.data.variant,
+            duration: event.data.duration,
+        })
+    })
     const api: ViewApi = {
         renderer: ctx.renderer,
         theme: {
@@ -112,4 +122,5 @@ export async function setup(ctx: Plugin.Context) {
             return null
         },
     })
+    return () => stopNotify()
 }
