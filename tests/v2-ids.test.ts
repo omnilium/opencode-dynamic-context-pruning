@@ -145,6 +145,19 @@ test("V2 cleans echoed IDs and priorities before injecting correct protected/mes
     )
 })
 
+test("V2 compact cleanup strips only trailing echoed tags, keeping inline mentions", () => {
+    assert.equal(
+        stripHallucinationsFromString("It’s 2026.\n@94@ [high]", "compact"),
+        "It’s 2026.\n",
+    )
+    assert.equal(stripHallucinationsFromString("Result @b9@ @blocked@", "compact"), "Result ")
+    assert.equal(
+        stripHallucinationsFromString("See @4@ and @5@ for details", "compact"),
+        "See @4@ and @5@ for details",
+    )
+    assert.equal(stripHallucinationsFromString("mail a@b.com", "compact"), "mail a@b.com")
+})
+
 test("V2 range compression resolves block IDs and expands nested placeholders", async () => {
     const { raw, state, settings, client, tool, run, sessionID } = fixture("range")
     await tool.execute(

@@ -10,7 +10,7 @@ const DCP_PAIRED_TAG_REGEX = /<dcp[^>]*>[\s\S]*?<\/dcp[^>]*>/gi
 const DCP_UNPAIRED_TAG_REGEX = /<\/?dcp[^>]*>/gi
 const INJECTED_MESSAGE_ID_SUFFIX_REGEX = /(?<=\n)<dcp-message-id[^>]*>m\d+<\/dcp-message-id>\s*$/
 const HALLUCINATED_PARAMETER_SUFFIX_REGEX = /(?<=\n)m\d+<\/parameter>\s*$/
-const COMPACT_TAG_REGEX = /@(?:[1-9]\d*|b[1-9]\d*|blocked)@(?:[ \t]+\[(?:low|medium|high)\])?/gi
+const COMPACT_TAG_SUFFIX = /@(?:\d+|b\d+|blocked)@(?:[ \t]+\[(?:low|medium|high)\])?[ \t]*$/i
 
 const generateStableId = (prefix: string, seed: string): string => {
     const hash = createHash("sha256").update(seed).digest("hex").slice(0, SUMMARY_ID_HASH_LENGTH)
@@ -167,8 +167,21 @@ export const replaceBlockIdsWithBlocked = (text: string, format: IdFormat = "xml
     return text.replace(DCP_BLOCK_ID_TAG_REGEX, "$1BLOCKED$2")
 }
 
+// The model can echo an ID inline (e.g. "see @4@"), so only trailing tags are removed;
+// the preceding newline is preserved to keep the original formatting.
+const stripTrailingCompactTags = (text: string): string => {
+    let stripped = text
+    for (;;) {
+        const next = stripped.replace(COMPACT_TAG_SUFFIX, "")
+        if (next === stripped) {
+            return stripped
+        }
+        stripped = next
+    }
+}
+
 export const stripHallucinationsFromString = (text: string, format: IdFormat = "xml"): string => {
-    if (format === "compact") text = text.replace(COMPACT_TAG_REGEX, "")
+    if (format === "compact") text = stripTrailingCompactTags(text)
     const withoutKnownSuffixes = text
         .replace(INJECTED_MESSAGE_ID_SUFFIX_REGEX, "")
         .replace(HALLUCINATED_PARAMETER_SUFFIX_REGEX, "")

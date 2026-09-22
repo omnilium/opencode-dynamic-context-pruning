@@ -1,7 +1,7 @@
 import type { SessionState, WithParts } from "./state"
 import type { Logger } from "./logger"
 import type { PluginConfig } from "./config"
-import { assignMessageRefs } from "./message-ids"
+import { assignMessageRefs, type IdFormat } from "./message-ids"
 import {
     buildPriorityMap,
     buildToolIdList,
@@ -130,7 +130,7 @@ export function createChatMessageTransformHandler(
             return
         }
 
-        stripHallucinations(output.messages)
+        stripHallucinations(output.messages, state.idFormat)
         cacheSystemPromptTokens(state, output.messages)
         assignMessageRefs(state, output.messages)
         syncCompressionBlocks(state, logger, output.messages)
@@ -289,12 +289,12 @@ export function createCommandExecuteHandler(
     }
 }
 
-export function createTextCompleteHandler() {
+export function createTextCompleteHandler(format: IdFormat = "xml") {
     return async (
         _input: { sessionID: string; messageID: string; partID: string },
         output: { text: string },
     ) => {
-        output.text = stripHallucinationsFromString(output.text)
+        output.text = stripHallucinationsFromString(output.text, format)
     }
 }
 

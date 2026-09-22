@@ -771,6 +771,13 @@ test("hallucination stripping removes all dcp-prefixed XML tags including varian
     assert.equal(output.text, "alphaomega")
 })
 
+test("createTextCompleteHandler strips compact echoes when given the compact format", async () => {
+    const handler = createTextCompleteHandler("compact")
+    const output = { text: "Done.\n\n@170@" }
+    await handler({ sessionID: "session", messageID: "message", partID: "part" }, output)
+    assert.equal(output.text, "Done.\n\n")
+})
+
 test("hallucination stripping removes colon and underscore dcp tag variants", async () => {
     assert.equal(stripHallucinationsFromString("beforeafter"), "beforeafter")
     assert.equal(stripHallucinationsFromString("startend"), "startend")

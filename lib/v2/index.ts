@@ -29,6 +29,7 @@ import {
 import { countTokens } from "../token-utils"
 import { matchesGlob } from "../protected-patterns"
 import { history, project } from "./messages"
+import { createLanguageStripHook } from "./language-strip"
 import { analyzeContextTokens } from "../commands/context"
 import { buildStatsReport } from "../commands/stats"
 import { rpc } from "./rpc"
@@ -170,6 +171,9 @@ export async function setup(ctx: Plugin.Context) {
         for (const model of editor.list())
             limits.set(`${model.providerID}/${model.id}`, model.limit.context)
     })
+    // V2 exposes no output-text hook, so strip echoed IDs off the language model
+    // stream itself before the model's reply is persisted or rendered.
+    await ctx.aisdk.hook("language", createLanguageStripHook("compact"))
     for (const kind of ["context", "compaction"] as const)
         await ctx.session.hook(kind, (event) =>
             serial(event.sessionID, async () => {
