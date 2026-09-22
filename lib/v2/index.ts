@@ -24,12 +24,14 @@ import {
     injectExtendedSubAgentResults,
     prune,
     stripHallucinations,
+    stripTrailingMessageIdFromLastMessage,
     syncCompressionBlocks,
 } from "../messages"
 import { countTokens } from "../token-utils"
 import { matchesGlob } from "../protected-patterns"
 import { history, project } from "./messages"
 import { createLanguageStripHook } from "./language-strip"
+import { stripHttpResponseEchoes } from "./http-strip"
 import { analyzeContextTokens } from "../commands/context"
 import { buildStatsReport } from "../commands/stats"
 import { rpc } from "./rpc"
@@ -180,9 +182,14 @@ export async function setup(ctx: Plugin.Context) {
         for (const model of editor.list())
             limits.set(`${model.providerID}/${model.id}`, model.limit.context)
     })
-    // V2 exposes no output-text hook, so strip echoed IDs off the language model
-    // stream itself before the model's reply is persisted or rendered.
+    // The aisdk language hook only fires for `aisdk:` packages, so strip echoed
+    // IDs from the resolved language model wherever it does apply.
     await ctx.aisdk.hook("language", createLanguageStripHook("compact"))
+    // Native-packaged providers (e.g. opencode-go) bypass the aisdk hook entirely,
+    // so also strip echoed IDs from the raw provider SSE stream.
+    await ctx.session.hook("http.response", (event) => {
+        stripHttpResponseEchoes(event, "compact")
+    })
     for (const kind of ["context", "compaction"] as const)
         await ctx.session.hook(kind, (event) =>
             serial(event.sessionID, async () => {
@@ -230,6 +237,7 @@ export async function setup(ctx: Plugin.Context) {
                     kind === "context",
                 )
                 injectMessageIds(state, config, view.messages, priorities)
+                stripTrailingMessageIdFromLastMessage(view.messages, state.idFormat)
                 applyPendingManualTrigger(state, view.messages, logger)
                 event.messages = view.restore()
                 const system = { system: event.system.map((part) => part.text) }

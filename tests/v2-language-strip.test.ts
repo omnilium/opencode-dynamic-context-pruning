@@ -245,3 +245,25 @@ test("createLanguageStripHook prefers modelID when building the base model", () 
 
     assert.deepEqual(calls, ["model-id-value"])
 })
+
+test("stripTrailingTag removes a compact tag followed by a trailing newline", () => {
+    assert.equal(stripTrailingTag("Done.\n\n@86@\n", "compact"), "Done.")
+    assert.equal(stripTrailingTag("Done.\n\n@86@ \n", "compact"), "Done.")
+})
+
+test("stripLanguageModel strips a streamed tag that ends with a newline", async () => {
+    const wrapped = stripLanguageModel(
+        baseModel([
+            { type: "text-start", id: "t0" },
+            { type: "text-delta", id: "t0", delta: "Hello\n\n@86@" },
+            { type: "text-delta", id: "t0", delta: "\n" },
+            { type: "text-end", id: "t0" },
+        ]),
+        "compact",
+    )
+
+    const result = await wrapped.doStream({})
+    const parts = await collect(result.stream)
+
+    assert.equal(deltaText(parts), "Hello")
+})

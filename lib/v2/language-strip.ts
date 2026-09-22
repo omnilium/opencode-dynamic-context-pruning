@@ -12,13 +12,13 @@ interface LanguageModelLike {
 // A hallucinated tag is newline-prefixed and lands at the very end of the text.
 // Anchoring to the suffix leaves legitimate mid-text IDs and email addresses intact.
 const COMPACT_TAG_SUFFIX =
-    /(?:^|\n+)@(?:\d+|b\d+|blocked)@(?:[ \t]+\[(?:low|medium|high)\])?[ \t]*$/i
-const XML_TAG_SUFFIX = /(?:^|\n+)<dcp-message-id>[^<]*<\/dcp-message-id>[ \t]*$/
-const XML_PARAMETER_SUFFIX = /(?:^|\n+)m\d+<\/parameter>[ \t]*$/
+    /(?:^|\n+)@(?:\d+|b\d+|blocked)@(?:[ \t]+\[(?:low|medium|high)\])?[ \t\r\n]*$/i
+const XML_TAG_SUFFIX = /(?:^|\n+)<dcp-message-id>[^<]*<\/dcp-message-id>[ \t\r\n]*$/
+const XML_PARAMETER_SUFFIX = /(?:^|\n+)m\d+<\/parameter>[ \t\r\n]*$/
 
 // Hold back any tail that could still grow into a trailing tag, so a tag split
 // across deltas is never emitted in part. MAX_TAG_TAIL bounds the latency that hold adds.
-const TAG_TAIL_CANDIDATE = /(?:^|\n+)@(?:[0-9a-z]+@?(?:[ \t]+\[[a-z]*\]?)?[ \t]*)?$/i
+const TAG_TAIL_CANDIDATE = /(?:^|\n+)@(?:[0-9a-z]+@?(?:[ \t]+\[[a-z]*\]?)?[ \t\r\n]*)?$/i
 const MAX_TAG_TAIL = 40
 
 export function stripTrailingTag(text: string, format: IdFormat = "compact"): string {
@@ -36,17 +36,50 @@ function safeEmitLength(buffer: string): number {
     return match.index
 }
 
-function createTagStrippingTransform(format: IdFormat): TransformStream<StreamPart, StreamPart> {
+export interface DeltaStripper {
+    push(id: string, delta: string): string
+    end(id: string): string
+    flush(): Array<{ id: string; delta: string }>
+}
+
+// Shared by the language-model stream wrapper and the raw provider SSE rewrite:
+// both hold back a tail that could still grow into a trailing ID tag.
+export function createDeltaStripper(format: IdFormat = "compact"): DeltaStripper {
     const buffers = new Map<string, string>()
 
-    const flushBuffers = (controller: TransformStreamDefaultController<StreamPart>) => {
-        for (const [id, buffer] of buffers) {
-            const remaining = stripTrailingTag(buffer, format)
-            if (remaining.length > 0) {
-                controller.enqueue({ type: "text-delta", id, delta: remaining })
+    return {
+        push(id, delta) {
+            const buffer = (buffers.get(id) ?? "") + delta
+            const emit = safeEmitLength(buffer)
+            buffers.set(id, buffer.slice(emit))
+            return buffer.slice(0, emit)
+        },
+        end(id) {
+            const buffer = buffers.get(id) ?? ""
+            buffers.delete(id)
+            return stripTrailingTag(buffer, format)
+        },
+        flush() {
+            const remaining: Array<{ id: string; delta: string }> = []
+            for (const [id, buffer] of buffers) {
+                const stripped = stripTrailingTag(buffer, format)
+                if (stripped.length > 0) {
+                    remaining.push({ id, delta: stripped })
+                }
             }
+            buffers.clear()
+            return remaining
+        },
+    }
+}
+
+function createTagStrippingTransform(format: IdFormat): TransformStream<StreamPart, StreamPart> {
+    const stripper = createDeltaStripper(format)
+
+    const flushBuffers = (controller: TransformStreamDefaultController<StreamPart>) => {
+        for (const { id, delta } of stripper.flush()) {
+            controller.enqueue({ type: "text-delta", id, delta })
         }
-        buffers.clear()
     }
 
     return new TransformStream<StreamPart, StreamPart>({
@@ -56,24 +89,19 @@ function createTagStrippingTransform(format: IdFormat): TransformStream<StreamPa
                 typeof part.id === "string" &&
                 typeof part.delta === "string"
             ) {
-                const buffer = (buffers.get(part.id) ?? "") + part.delta
-                const emit = safeEmitLength(buffer)
-                buffers.set(part.id, buffer.slice(emit))
-                if (emit > 0) {
-                    controller.enqueue({ ...part, delta: buffer.slice(0, emit) })
+                const emit = stripper.push(part.id, part.delta)
+                if (emit.length > 0) {
+                    controller.enqueue({ ...part, delta: emit })
                 }
                 return
             }
             if (part.type === "text-start" && typeof part.id === "string") {
                 flushBuffers(controller)
-                buffers.set(part.id, "")
                 controller.enqueue(part)
                 return
             }
             if (part.type === "text-end" && typeof part.id === "string") {
-                const buffer = buffers.get(part.id) ?? ""
-                buffers.delete(part.id)
-                const remaining = stripTrailingTag(buffer, format)
+                const remaining = stripper.end(part.id)
                 if (remaining.length > 0) {
                     controller.enqueue({ type: "text-delta", id: part.id, delta: remaining })
                 }

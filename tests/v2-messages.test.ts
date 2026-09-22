@@ -4,7 +4,7 @@ import type { Message } from "@opencode/ai/schema/messages"
 import { project } from "../lib/v2/messages"
 import { createSessionState, type CompressionBlock } from "../lib/state"
 import { assignMessageRefs } from "../lib/message-ids"
-import { injectMessageIds, prune } from "../lib/messages"
+import { injectMessageIds, prune, stripTrailingMessageIdFromLastMessage } from "../lib/messages"
 import type { PluginConfig } from "../lib/config"
 import { Logger } from "../lib/logger"
 
@@ -168,4 +168,28 @@ test("V2 inserts summaries after native checkpoints without an ordinary user mes
     assert.equal(restored.length, 2)
     assert.deepEqual(restored[0], native[0])
     assert.deepEqual(restored[1]?.content, [{ type: "text", text: "CHECKPOINT_SUMMARY" }])
+})
+
+test("V2 drops the trailing injected ID from the final message", () => {
+    const native = transcript()
+    const view = project(native, entries(native), session)
+    const state = createSessionState("compact")
+    assignMessageRefs(state, view.messages)
+    injectMessageIds(state, config, view.messages, new Map())
+    const lastText = () =>
+        view.messages
+            .at(-1)!
+            .parts.map((part) => (part.type === "text" ? part.text : ""))
+            .join("")
+    assert.match(lastText(), /@\d+@\s*$/, "the injected ID must be present before stripping")
+
+    stripTrailingMessageIdFromLastMessage(view.messages, "compact")
+
+    assert.equal(lastText(), "Continue")
+    const restored = view.restore()
+    const lastContent = restored
+        .at(-1)!
+        .content.map((part) => (part.type === "text" ? part.text : ""))
+        .join("")
+    assert.equal(lastContent, "Continue")
 })

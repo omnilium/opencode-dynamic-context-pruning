@@ -12,7 +12,7 @@ AGPL-3.0-or-later.
 | `index.ts`            | default export `{ id, setup, server }` — `server` is the V1 plugin, `setup` is the V2 plugin from `lib/v2/index.ts`            |
 | `tui.tsx`             | default export `{ id, setup, tui }` — `tui` is the V1 TUI module, `setup` is the V2 TUI plugin from `lib/v2/tui.tsx`           |
 | `server.js`           | V1 server entrypoint; re-exports `dist/index.js`                                                                               |
-| `lib/v2/`             | V2 adapters — server `index`, `messages` projection, `rpc`, `language-strip`, `notify`, TUI                                    |
+| `lib/v2/`             | V2 adapters — server `index`, `messages` projection, `rpc`, `language-strip`, `http-strip`, `notify`, TUI                      |
 | `lib/compress/`       | `compress` tool pipelines (range and message modes)                                                                            |
 | `lib/messages/`       | context transforms — inject, prune, query, sync, reasoning-strip                                                               |
 | `lib/state/`          | session state and persistence                                                                                                  |
@@ -62,8 +62,10 @@ Both hosts ship from this one package. Exercise both when changing shared behavi
   registers through `ctx.*.transform`/`hook` in `lib/v2/index.ts` and ships its TUI in `lib/v2/tui.tsx`.
 - **Notifications.** V1 uses model-invisible "ignored" chat messages. V2 has no equivalent, so it emits the `notify` RPC
   event and the TUI shows a toast; `lib/v2/index.ts` forces `pruneNotificationType` to `"toast"`.
-- **Output text.** V2 exposes no output-text hook, so `lib/v2/language-strip.ts` wraps the resolved AI SDK language
-  model to strip echoed ID tags from `doStream` deltas and `doGenerate` content.
+- **Output text.** V2 has two echo-strip seams, because native-packaged providers (e.g. `opencode-go`, whose `package`
+  is `@opencode/ai/providers/*`) never run `ctx.aisdk.hook("language")`. `lib/v2/language-strip.ts` wraps the resolved
+  AI SDK language model and only fires for `aisdk:` packages; `lib/v2/http-strip.ts` rewrites the primary provider's
+  OpenAI-chat SSE stream and covers every package.
 
 ## Testing
 
@@ -100,6 +102,9 @@ Apply the house rules through their skills — `writing-ts`, `writing-markdown`,
   event to a toast.
 - **Keep the ID-strip patterns suffix-anchored** in `lib/v2/language-strip.ts`: a hallucinated tag is newline-prefixed
   and lands at the end, so mid-text IDs and email addresses must survive.
+- **The last message must not end with its own ID.** `injectMessageIds` appends each message's tag, and the model
+  answers the final message by continuing it; `stripTrailingMessageIdFromLastMessage` drops that one ID after injection
+  in both hosts. Older IDs stay in place.
 - **`jsonc-parser` is inlined** by tsup (`noExternal`) because its ESM imports are broken — don't drop that.
 - V2 `compress` permission `"ask"` is unsupported by the public plugin API and surfaces as an error rather than a
   prompt.

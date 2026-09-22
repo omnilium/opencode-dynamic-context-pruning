@@ -10,7 +10,7 @@ const DCP_PAIRED_TAG_REGEX = /<dcp[^>]*>[\s\S]*?<\/dcp[^>]*>/gi
 const DCP_UNPAIRED_TAG_REGEX = /<\/?dcp[^>]*>/gi
 const INJECTED_MESSAGE_ID_SUFFIX_REGEX = /(?<=\n)<dcp-message-id[^>]*>m\d+<\/dcp-message-id>\s*$/
 const HALLUCINATED_PARAMETER_SUFFIX_REGEX = /(?<=\n)m\d+<\/parameter>\s*$/
-const COMPACT_TAG_SUFFIX = /@(?:\d+|b\d+|blocked)@(?:[ \t]+\[(?:low|medium|high)\])?[ \t]*$/i
+const COMPACT_TAG_SUFFIX = /@(?:\d+|b\d+|blocked)@(?:[ \t]+\[(?:low|medium|high)\])?[ \t\r\n]*$/i
 
 const generateStableId = (prefix: string, seed: string): string => {
     const hash = createHash("sha256").update(seed).digest("hex").slice(0, SUMMARY_ID_HASH_LENGTH)
@@ -204,6 +204,43 @@ export const stripHallucinations = (messages: WithParts[], format: IdFormat = "x
             ) {
                 part.state.output = stripHallucinationsFromString(part.state.output, format)
             }
+        }
+    }
+}
+
+export const stripTrailingMessageIdTag = (text: string, format: IdFormat = "xml"): string => {
+    const stripped =
+        format === "compact"
+            ? stripTrailingCompactTags(text)
+            : text
+                  .replace(INJECTED_MESSAGE_ID_SUFFIX_REGEX, "")
+                  .replace(HALLUCINATED_PARAMETER_SUFFIX_REGEX, "")
+    // The injector separates content from its tag with a blank line; drop that too.
+    return stripped === text ? text : stripped.replace(/[ \t\r\n]+$/, "")
+}
+
+// The model answers the last message, so leaving that message's own ID at the very
+// end of the context invites it to continue the tag. Every older ID stays in place.
+export const stripTrailingMessageIdFromLastMessage = (
+    messages: WithParts[],
+    format: IdFormat = "xml",
+): void => {
+    const message = messages[messages.length - 1]
+    if (!message) return
+
+    for (let index = message.parts.length - 1; index >= 0; index--) {
+        const part = message.parts[index]
+        if (part.type === "text" && typeof part.text === "string") {
+            part.text = stripTrailingMessageIdTag(part.text, format)
+            return
+        }
+        if (
+            part.type === "tool" &&
+            part.state?.status === "completed" &&
+            typeof part.state.output === "string"
+        ) {
+            part.state.output = stripTrailingMessageIdTag(part.state.output, format)
+            return
         }
     }
 }

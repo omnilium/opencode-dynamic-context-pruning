@@ -12,6 +12,7 @@ import {
     stripHallucinations,
     stripHallucinationsFromString,
     stripStaleMetadata,
+    stripTrailingMessageIdFromLastMessage,
     syncCompressionBlocks,
 } from "./messages"
 import { renderSystemPrompt, type PromptStore } from "./prompts"
@@ -155,6 +156,7 @@ export function createChatMessageTransformHandler(
             compressionPriorities,
         )
         injectMessageIds(state, config, output.messages, compressionPriorities)
+        stripTrailingMessageIdFromLastMessage(output.messages, state.idFormat)
         applyPendingManualTrigger(state, output.messages, logger)
         stripStaleMetadata(output.messages)
 
