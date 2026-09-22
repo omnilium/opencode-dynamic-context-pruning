@@ -98,9 +98,9 @@ try {
         for (const plugin of tui.plugin ?? []) {
             if (
                 typeof plugin === "string" &&
-                (plugin === "/lab/plugins/node_modules/@tarquinen/opencode-dcp" ||
-                    plugin === "@tarquinen/opencode-dcp" ||
-                    plugin.startsWith("@tarquinen/opencode-dcp@"))
+                (plugin === "/lab/plugins/node_modules/@omnilium/opencode-dcp" ||
+                    plugin === "@omnilium/opencode-dcp" ||
+                    plugin.startsWith("@omnilium/opencode-dcp@"))
             )
                 continue
             plugins.push(plugin)
@@ -114,7 +114,7 @@ try {
             JSON.stringify(
                 {
                     $schema:
-                        "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/main/dcp.schema.json",
+                        "https://raw.githubusercontent.com/omnilium/opencode-dynamic-context-pruning/master/dcp.schema.json",
                     autoUpdate: false,
                     debug: true,
                     pruneNotification: "off",

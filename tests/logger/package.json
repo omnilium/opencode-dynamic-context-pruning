@@ -14,10 +14,10 @@
     ],
     "scripts": {
         "clean": "rm -rf dist",
-        "build": "npm run clean && tsc",
-        "prepack": "npm run build",
+        "build": "pnpm run clean && tsc",
+        "prepack": "pnpm run build",
         "typecheck": "tsc --noEmit",
-        "test": "npm run build && node --test tests/*.test.mjs"
+        "test": "pnpm run build && node --test tests/*.test.mjs"
     },
     "peerDependencies": {
         "@opencode-ai/plugin": ">=1.18.29",

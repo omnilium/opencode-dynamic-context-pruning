@@ -1,26 +1,30 @@
 # Dynamic Context Pruning Plugin
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/dansmolsky)
-[![npm version](https://img.shields.io/npm/v/@tarquinen/opencode-dcp.svg)](https://www.npmjs.com/package/@tarquinen/opencode-dcp)
+[![npm
+version](https://img.shields.io/npm/v/@omnilium/opencode-dcp.svg)](https://www.npmjs.com/package/@omnilium/opencode-dcp)
 
 Automatically reduces token usage in OpenCode by managing conversation context.
 
 ![DCP in action](assets/images/dcp-demo9.png)
+
+> [!NOTE]
+> This is Omnilium's fork of [tarquinen's DCP](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning). It is
+> licensed AGPL-3.0-or-later; the original work is © tarquinen and contributors.
 
 ## Installation
 
 Install from the OpenCode V2 CLI:
 
 ```bash
-opencode plugin add @tarquinen/opencode-dcp@latest
+opencode plugin add @omnilium/opencode-dcp@latest
 ```
 
 This installs the package and adds it to your global OpenCode config.
 
 ## Related Project
 
-[Sleev](https://sleev.ai) is a local proxy for coding agents, including Claude Code,
-Codex, and OpenCode. It provides context management through the `sleev` CLI:
+[Sleev](https://sleev.ai) is a local proxy for coding agents, including Claude Code, Codex, and OpenCode. It provides
+context management through the `sleev` CLI:
 
 ```bash
 npm i -g sleev
@@ -29,26 +33,39 @@ sleev
 
 ## How It Works
 
-DCP reduces context size through a compress tool and automatic cleanup. Your session history is never modified — DCP replaces pruned content with placeholders before sending requests to your LLM.
+DCP reduces context size through a compress tool and automatic cleanup. Your session history is never modified — DCP
+replaces pruned content with placeholders before sending requests to your LLM.
 
 ### Compress
 
-Compress is a tool exposed to your model that replaces closed, stale conversation content with high-fidelity technical summaries. You can think of this as a much smarter version of Opencode's compaction process. Instead of triggering statically when your session reaches its maximum context and on the entire coding session, Compress allows the model to pick when to activate based on task completion, and to only compress the specific messages that are no longer needed verbatim.
+Compress is a tool exposed to your model that replaces closed, stale conversation content with high-fidelity technical
+summaries. You can think of this as a much smarter version of Opencode's compaction process. Instead of triggering
+statically when your session reaches its maximum context and on the entire coding session, Compress allows the model to
+pick when to activate based on task completion, and to only compress the specific messages that are no longer needed
+verbatim.
 
 DCP supports two compression modes:
 
 - `range` mode compresses contiguous spans of conversation into one or more summaries.
-- `message` mode (experimental) compresses individual raw messages independently, letting the model manage context much more surgically.
+- `message` mode (experimental) compresses individual raw messages independently, letting the model manage context much
+  more surgically.
 
-In `range` mode, when a new compression overlaps an earlier one, the earlier summary is nested inside the new one so information is preserved through layers of compression rather than diluted away. In both modes, protected tool outputs (such as subagents and skills) and protected file patterns are kept in compression summaries, ensuring that the most important information is never lost. You can also enable `protectUserMessages` to preserve your messages verbatim during compression, though note that large prompts (e.g. copy-pasting log files in the prompt) will then never be compressed away.
+In `range` mode, when a new compression overlaps an earlier one, the earlier summary is nested inside the new one so
+information is preserved through layers of compression rather than diluted away. In both modes, protected tool outputs
+(such as subagents and skills) and protected file patterns are kept in compression summaries, ensuring that the most
+important information is never lost. You can also enable `protectUserMessages` to preserve your messages verbatim during
+compression, though note that large prompts (e.g. copy-pasting log files in the prompt) will then never be compressed
+away.
 
 ### Deduplication
 
-Identifies repeated tool calls (same tool, same arguments) and keeps only the most recent output. Recalculated when the compress tool runs, so prompt cache is only impacted alongside compression.
+Identifies repeated tool calls (same tool, same arguments) and keeps only the most recent output. Recalculated when the
+compress tool runs, so prompt cache is only impacted alongside compression.
 
 ### Purge Errors
 
-Prunes inputs from errored tool calls after a configurable number of turns. Error messages are preserved; only the potentially large input content is removed. Recalculated on compress tool use.
+Prunes inputs from errored tool calls after a configurable number of turns. Error messages are preserved; only the
+potentially large input content is removed. Recalculated on compress tool use.
 
 ## Configuration
 
@@ -58,10 +75,12 @@ DCP uses its own config file, searched in order:
 2. Custom config directory: `$OPENCODE_CONFIG_DIR/dcp.jsonc` (or `dcp.json`), if `OPENCODE_CONFIG_DIR` is set
 3. Project: `.opencode/dcp.jsonc` (or `dcp.json`) in your project's `.opencode` directory
 
-Each level overrides the previous, so project settings take priority over global. Restart OpenCode after making config changes.
+Each level overrides the previous, so project settings take priority over global. Restart OpenCode after making config
+changes.
 
 > [!NOTE]
-> If your model has a smaller context window, lower `compress.minContextLimit` and `compress.maxContextLimit` in your configuration to match the available context.
+> If your model has a smaller context window, lower `compress.minContextLimit` and `compress.maxContextLimit` in your
+> configuration to match the available context.
 
 > [!IMPORTANT]
 > Defaults are applied automatically. Expand this if you want to review or override settings.
@@ -71,7 +90,7 @@ Each level overrides the previous, so project settings take priority over global
 
 ```jsonc
 {
-    "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
+    "$schema": "https://raw.githubusercontent.com/omnilium/opencode-dynamic-context-pruning/master/dcp.schema.json",
     // Enable or disable the plugin
     "enabled": true,
     // Automatically update npm-installed DCP when a newer npm latest is available.
@@ -187,7 +206,8 @@ Each level overrides the previous, so project settings take priority over global
 DCP provides a TUI panel and one prompt-producing slash command:
 
 - `/dcp` — Opens the DCP panel with context, stats, and manual-mode controls.
-- `/dcp-compress [focus]` — Asks the model to run one compression pass. Optional focus text directs what content to compress, following the active `compress.mode`.
+- `/dcp-compress [focus]` — Asks the model to run one compression pass. Optional focus text directs what content to
+  compress, following the active `compress.mode`.
 
 ### Prompt Overrides
 
@@ -202,7 +222,8 @@ DCP exposes the following editable prompts:
 
 This feature is disabled by default. Set `experimental.customPrompts` to `true` in your DCP config to activate it.
 
-When enabled, managed defaults are written to `~/.config/opencode/dcp-prompts/defaults/` as plain-text prompt files. A single `README.md` in that directory explains each prompt and how to create overrides.
+When enabled, managed defaults are written to `~/.config/opencode/dcp-prompts/defaults/` as plain-text prompt files. A
+single `README.md` in that directory explains each prompt and how to create overrides.
 
 To customize behavior, add a file with the same name under an overrides directory and edit it as plain text.
 
@@ -210,19 +231,21 @@ To reset an override, delete the matching file from your overrides directory.
 
 ### Protected Tools
 
-By default, these tools are always protected from pruning:
-`task`, `skill`, `todowrite`, `todoread`, `compress`, `batch`, `plan_enter`, `plan_exit`, `write`, `edit`
+By default, these tools are always protected from pruning: `task`, `skill`, `todowrite`, `todoread`, `compress`,
+`batch`, `plan_enter`, `plan_exit`, `write`, `edit`
 
 The `protectedTools` arrays in `commands` and `strategies` add to this default list.
 
-For the `compress` tool, `compress.protectedTools` ensures specific tool outputs are appended to the compressed summary. By default it includes `task`, `skill`, `todowrite`, and `todoread`.
+For the `compress` tool, `compress.protectedTools` ensures specific tool outputs are appended to the compressed summary.
+By default it includes `task`, `skill`, `todowrite`, and `todoread`.
 
 ## Impact on Prompt Caching
 
-LLM providers cache prompts based on exact prefix matching. When DCP prunes content, it changes messages, which invalidates cached prefixes from that point forward.
+LLM providers cache prompts based on exact prefix matching. When DCP prunes content, it changes messages, which
+invalidates cached prefixes from that point forward.
 
-**Trade-off:** Pruning reduces context size but can increase cache misses. The cost
-balance depends on your conversation, compression frequency, and provider pricing.
+**Trade-off:** Pruning reduces context size but can increase cache misses. The cost balance depends on your
+conversation, compression frequency, and provider pricing.
 
 **No impact for:**
 
@@ -231,9 +254,10 @@ balance depends on your conversation, compression frequency, and provider pricin
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, local installation,
-and testing with the V1/V2 sandbox.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, local installation, and testing with the V1/V2 sandbox.
 
 ## License
 
-AGPL-3.0-or-later
+AGPL-3.0-or-later. This project is a fork of
+[tarquinen/opencode-dcp](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning); the original work is ©
+tarquinen and contributors.

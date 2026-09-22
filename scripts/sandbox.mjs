@@ -40,7 +40,7 @@ Each launch uses the latest stable release of the selected major version.
   --logs              Show the latest raw/readable log paths and capture counts
   --path              Print the current sandbox's host directory
   --opencode VERSION  Use an exact version for this launch (V1 requires 1.18.29+)
-  --dcp VERSION       Use npm DCP (e.g. latest or 3.2.0); default: local checkout
+  --dcp VERSION       Use published DCP (e.g. latest or 1.0.0); default: local checkout
   --model MODEL       Remember a provider/model (otherwise OpenCode selects one)
   --transport TYPE    V2: websocket or http; V1: http only
 
@@ -48,7 +48,7 @@ Examples:
   dcp-sandbox
   dcp-sandbox --v1
   dcp-sandbox --dcp latest --fresh
-  dcp-sandbox --opencode 2.0.12 --dcp 3.2.0
+  dcp-sandbox --opencode 2.0.12 --dcp 1.0.0
   dcp-sandbox --v1 --logs
   dcp-sandbox -- --continue
   dcp-sandbox -- run --format json "Reply with OK."
@@ -108,7 +108,7 @@ async function main() {
     let release = values.opencode
     if (!release) {
         const versions = JSON.parse(
-            execFileSync("npm", ["view", `${packageName}@${major}`, "version", "--json"], {
+            execFileSync("pnpm", ["view", `${packageName}@${major}`, "version", "--json"], {
                 encoding: "utf8",
             }),
         )
@@ -169,20 +169,16 @@ async function main() {
         join(repo, "scripts/sandbox"),
     ])
     console.log(dcp === "local" ? "Building DCP and request logger…" : "Building request logger…")
-    if (!existsSync(join(repo, "node_modules"))) command("npm", ["ci", "--legacy-peer-deps"])
+    if (!existsSync(join(repo, "node_modules"))) command("pnpm", ["install", "--frozen-lockfile"])
     const packages = []
     const directories = [join(repo, "tests/logger")]
     if (dcp === "local") directories.unshift(repo)
     for (const directory of directories) {
-        command("npm", ["run", "build"], directory)
+        command("pnpm", ["run", "build"], directory)
         const packed = JSON.parse(
-            command(
-                "npm",
-                ["pack", "--ignore-scripts", "--json", "--pack-destination", input],
-                directory,
-            ),
+            command("pnpm", ["pack", "--json", "--pack-destination", input], directory),
         )
-        packages.push(Object.values(packed)[0].filename)
+        packages.push(packed.filename)
     }
     const auth = join(input, "auth.json")
     try {
@@ -196,8 +192,8 @@ async function main() {
             major,
             dcp:
                 dcp === "local"
-                    ? "/lab/plugins/node_modules/@tarquinen/opencode-dcp"
-                    : `@tarquinen/opencode-dcp@${dcp}`,
+                    ? "/lab/plugins/node_modules/@omnilium/opencode-dcp"
+                    : `@omnilium/opencode-dcp@${dcp}`,
             packages,
             stamp,
             args: cli,
@@ -205,7 +201,7 @@ async function main() {
         console.log(
             `OpenCode ${release} · ${settings.model || "default model"} · ${settings.transport || "provider transport"}`,
         )
-        console.log(`DCP: ${dcp === "local" ? "local checkout" : `@tarquinen/opencode-dcp@${dcp}`}`)
+        console.log(`DCP: ${dcp === "local" ? "local checkout" : `@omnilium/opencode-dcp@${dcp}`}`)
         console.log(`Workspace: ${join(home, "project")}`)
         console.log(`DCP config: ${join(home, "home/config/opencode/dcp.jsonc")}`)
         console.log(`Readable logs: ${join(home, "logs", stamp, "readable")}`)

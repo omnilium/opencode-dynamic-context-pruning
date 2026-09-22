@@ -13,14 +13,14 @@ const runtime = join(root, "runtime")
 const live = process.argv.includes("--live")
 mkdirSync(artifacts, { recursive: true, mode: 0o700 })
 mkdirSync(runtime, { recursive: true, mode: 0o700 })
-execFileSync("npm", ["pack", "--pack-destination", artifacts], {
+execFileSync("pnpm", ["pack", "--pack-destination", artifacts], {
     cwd: join(repo, "tests/logger"),
     stdio: "pipe",
 })
 if (!live && !process.argv.includes("--built")) {
-    execFileSync("npm", ["run", "build"], { cwd: repo, stdio: "inherit" })
+    execFileSync("pnpm", ["run", "build"], { cwd: repo, stdio: "inherit" })
 }
-execFileSync("npm", ["pack", "--ignore-scripts", "--pack-destination", artifacts], {
+execFileSync("pnpm", ["pack", "--pack-destination", artifacts], {
     cwd: repo,
     stdio: "pipe",
 })

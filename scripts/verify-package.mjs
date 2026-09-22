@@ -213,15 +213,20 @@ function validateRuntimeImportGraph() {
 }
 
 function validatePackedFiles() {
-    const output = execFileSync("npm", ["pack", "--dry-run", "--json"], {
+    const output = execFileSync("pnpm", ["pack", "--dry-run", "--json"], {
         cwd: root,
         encoding: "utf8",
     })
 
-    // npm versions return either an array or an object keyed by package name.
-    const [result] = Object.values(JSON.parse(output))
+    // pnpm returns a single object; npm returns an array or an object keyed by package name.
+    const parsed = JSON.parse(output)
+    const result = Array.isArray(parsed)
+        ? parsed[0]
+        : Array.isArray(parsed?.files)
+          ? parsed
+          : Object.values(parsed)[0]
     if (!result || !Array.isArray(result.files)) {
-        fail("npm pack --dry-run --json did not return file metadata")
+        fail("pnpm pack --dry-run --json did not return file metadata")
     }
 
     const packedPaths = result.files.map((file) => file.path)
@@ -239,7 +244,7 @@ function validatePackedFiles() {
     }
 
     console.log(`package verification passed for ${result.name}@${result.version}`)
-    console.log(`tarball entries: ${result.entryCount}`)
+    console.log(`tarball entries: ${packedPaths.length}`)
 }
 
 assertRepoFilesExist()

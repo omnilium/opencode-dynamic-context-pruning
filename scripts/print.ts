@@ -34,7 +34,7 @@ if (showHelp) {
 DCP Prompt Preview CLI
 
 Usage:
-  npm run dcp -- [options]
+  pnpm run dcp -- [options]
 
 Options:
   --list                   List available prompt keys
@@ -49,9 +49,9 @@ Prompt keys:
   context-limit-nudge, turn-nudge, iteration-nudge
 
 Examples:
-  npm run dcp -- --list
-  npm run dcp -- --show compress-range
-  npm run dcp -- --system-all
+  pnpm run dcp -- --list
+  pnpm run dcp -- --show compress-range
+  pnpm run dcp -- --system-all
 `)
     process.exit(0)
 }

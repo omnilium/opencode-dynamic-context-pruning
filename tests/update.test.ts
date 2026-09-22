@@ -27,32 +27,32 @@ test("isAutoUpdatableSpec rejects pinned and non-registry specs", () => {
 
 test("updateRemoveDir removes opencode npm wrapper for latest installs", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "dcp-update-"))
-    const wrapperDir = join(rootDir, "@tarquinen", "opencode-dcp@latest")
-    const packageDir = join(wrapperDir, "node_modules", "@tarquinen", "opencode-dcp")
+    const wrapperDir = join(rootDir, "@omnilium", "opencode-dcp@latest")
+    const packageDir = join(wrapperDir, "node_modules", "@omnilium", "opencode-dcp")
     await writePackageJson(wrapperDir, {
-        dependencies: { "@tarquinen/opencode-dcp": "3.1.10" },
+        dependencies: { "@omnilium/opencode-dcp": "3.1.10" },
     })
     await writePackageJson(packageDir, {
-        name: "@tarquinen/opencode-dcp",
+        name: "@omnilium/opencode-dcp",
         version: "3.1.9",
     })
 
-    assert.equal(await updateRemoveDir(packageDir, "@tarquinen/opencode-dcp"), wrapperDir)
+    assert.equal(await updateRemoveDir(packageDir, "@omnilium/opencode-dcp"), wrapperDir)
 })
 
 test("updateRemoveDir skips version-locked opencode installs", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "dcp-update-"))
-    const wrapperDir = join(rootDir, "@tarquinen", "opencode-dcp@3.1.9")
-    const packageDir = join(wrapperDir, "node_modules", "@tarquinen", "opencode-dcp")
+    const wrapperDir = join(rootDir, "@omnilium", "opencode-dcp@3.1.9")
+    const packageDir = join(wrapperDir, "node_modules", "@omnilium", "opencode-dcp")
     await writePackageJson(wrapperDir, {
-        dependencies: { "@tarquinen/opencode-dcp": "3.1.9" },
+        dependencies: { "@omnilium/opencode-dcp": "3.1.9" },
     })
     await writePackageJson(packageDir, {
-        name: "@tarquinen/opencode-dcp",
+        name: "@omnilium/opencode-dcp",
         version: "3.1.9",
     })
 
-    assert.equal(await updateRemoveDir(packageDir, "@tarquinen/opencode-dcp"), undefined)
+    assert.equal(await updateRemoveDir(packageDir, "@omnilium/opencode-dcp"), undefined)
 })
 
 async function writePackageJson(dir: string, data: Record<string, unknown>) {

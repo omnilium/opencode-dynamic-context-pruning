@@ -13,10 +13,10 @@ await run("npm", [
     "--omit=dev",
     "--ignore-scripts",
     "/artifacts/opencode-request-logger-0.1.0.tgz",
-    "/artifacts/tarquinen-opencode-dcp-3.1.15.tgz",
+    "/artifacts/omnilium-opencode-dcp-1.0.0.tgz",
 ])
 const logger = "/lab/plugins/node_modules/opencode-request-logger"
-const dcp = "/lab/plugins/node_modules/@tarquinen/opencode-dcp"
+const dcp = "/lab/plugins/node_modules/@omnilium/opencode-dcp"
 const { createRelay } = await import(pathToFileURL(join(logger, "relay.mjs")))
 const root = "/lab/live"
 const directory = join(root, "project")
