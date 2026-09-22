@@ -40,6 +40,17 @@ pnpm run check:package   # build + verify the publishable package
 `check:package` is required before publishing (`prepublishOnly`). CI mirrors format/typecheck/build/test and adds `pnpm
 audit --audit-level high`. There is no linter; `tsc` is the only static gate.
 
+## Release
+
+Publishing is **staged and tag-only**. `ci.yml` runs test & build on `master` and on PRs; it never publishes. A `v*` tag
+runs `publish.yml`, which validates on Blacksmith, verifies the tag matches `package.json`'s version, then — when that
+version is not yet on the registry — runs `pnpm stage publish` on a GitHub-hosted runner (Trusted Publishing +
+provenance; the sole Blacksmith exception). The trusted publisher allows staged publishing only, so the version is not
+live until a maintainer approves it with 2FA: `npm stage approve <stage-id>`, or the Staged Packages tab on npmjs.com.
+
+`npm view` cannot see a staged-but-unapproved version, so the workflow's "already published" guard does not cover one.
+Do not tag another release before approving, or the job re-stages the same version.
+
 ## V1 vs V2
 
 Both hosts ship from this one package. Exercise both when changing shared behaviour. Differences that bite:

@@ -1,10 +1,9 @@
 name: Publish
 
 on:
-    workflow_dispatch:
     push:
-        branches:
-            - master
+        tags:
+            - "v*"
 
 concurrency:
     group: publish-${{ github.ref }}
@@ -46,7 +45,7 @@ jobs:
               run: pnpm run build
 
     publish:
-        name: Publish to npm
+        name: Stage release on npm
         needs: validate
         # Trusted Publishing and provenance attestations only work on
         # GitHub-hosted runners, so this one job leaves Blacksmith.
@@ -70,6 +69,14 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
+            - name: Verify tag matches package version
+              run: |
+                  VERSION=$(node -p "require('./package.json').version")
+                  if [ "v${VERSION}" != "${GITHUB_REF_NAME}" ]; then
+                      echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${VERSION}." >&2
+                      exit 1
+                  fi
+
             - name: Check npm version
               id: package
               run: |
@@ -86,6 +93,14 @@ jobs:
                       echo "${NAME}@${VERSION} is not published yet."
                   fi
 
-            - name: Publish
+            - name: Stage release
               if: steps.package.outputs.published == 'false'
-              run: pnpm publish --provenance --access public --no-git-checks
+              run: |
+                  pnpm stage publish --provenance --access public --no-git-checks
+                  {
+                      echo "### Staged ${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}"
+                      echo ""
+                      echo "The trusted publisher allows staged publishing only, so this version is not live yet."
+                      echo "A maintainer must approve it with 2FA: \`npm stage approve <stage-id>\`, or the Staged Packages tab on npmjs.com."
+                      echo "List pending versions with \`npm stage list ${{ steps.package.outputs.name }}\`."
+                  } >> "$GITHUB_STEP_SUMMARY"
