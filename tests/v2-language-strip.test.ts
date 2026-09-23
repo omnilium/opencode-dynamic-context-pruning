@@ -267,3 +267,77 @@ test("stripLanguageModel strips a streamed tag that ends with a newline", async 
 
     assert.equal(deltaText(parts), "Hello")
 })
+
+const REMINDER = [
+    "<dcp-system-reminder>",
+    "Evaluate the conversation for compressible ranges.",
+    "Keep active context uncompressed.",
+    "</dcp-system-reminder>",
+].join("\n")
+
+test("stripLanguageModel drops a reminder block split across deltas", async () => {
+    const wrapped = stripLanguageModel(
+        baseModel([
+            { type: "text-start", id: "t0" },
+            { type: "text-delta", id: "t0", delta: "Done.\n\n<dcp-system" },
+            { type: "text-delta", id: "t0", delta: "-reminder>\nEvaluate the " },
+            { type: "text-delta", id: "t0", delta: "conversation.\n</dcp-system-reminder>" },
+            { type: "text-end", id: "t0" },
+        ]),
+        "compact",
+    )
+
+    const result = await wrapped.doStream({})
+    const parts = await collect(result.stream)
+
+    assert.equal(deltaText(parts), "Done.\n\n")
+    for (const part of parts) {
+        assert.doesNotMatch(part.delta ?? "", /dcp/, "no reminder fragment may be emitted")
+    }
+})
+
+test("stripLanguageModel drops a trailing reminder block from doGenerate", async () => {
+    const base = baseModel([])
+    base.doGenerate = async () => ({
+        content: [{ type: "text", text: `Report.\n\n${REMINDER}` }],
+        finishReason: { unified: "stop" },
+        usage: { inputTokens: 1, outputTokens: 2 },
+        warnings: [],
+    })
+    const wrapped = stripLanguageModel(base, "compact")
+    const result = await wrapped.doGenerate({})
+
+    assert.equal(result.content[0]?.text, "Report.\n\n")
+})
+
+test("stripLanguageModel keeps prose that follows a mid-text reminder block", async () => {
+    const wrapped = stripLanguageModel(
+        baseModel([
+            { type: "text-start", id: "t0" },
+            { type: "text-delta", id: "t0", delta: `Done.\n\n${REMINDER}\n\nMore text.` },
+            { type: "text-end", id: "t0" },
+        ]),
+        "compact",
+    )
+
+    const result = await wrapped.doStream({})
+    const parts = await collect(result.stream)
+
+    assert.equal(deltaText(parts), "Done.\n\n\n\nMore text.")
+})
+
+test("stripLanguageModel drops an unpaired opening reminder tag", async () => {
+    const wrapped = stripLanguageModel(
+        baseModel([
+            { type: "text-start", id: "t0" },
+            { type: "text-delta", id: "t0", delta: "Done.\n\n<dcp-system-reminder>half" },
+            { type: "text-end", id: "t0" },
+        ]),
+        "compact",
+    )
+
+    const result = await wrapped.doStream({})
+    const parts = await collect(result.stream)
+
+    assert.equal(deltaText(parts), "Done.\n\nhalf")
+})

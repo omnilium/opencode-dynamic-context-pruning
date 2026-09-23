@@ -65,7 +65,8 @@ Both hosts ship from this one package. Exercise both when changing shared behavi
 - **Output text.** V2 has two echo-strip seams, because native-packaged providers (e.g. `opencode-go`, whose `package`
   is `@opencode/ai/providers/*`) never run `ctx.aisdk.hook("language")`. `lib/v2/language-strip.ts` wraps the resolved
   AI SDK language model and only fires for `aisdk:` packages; `lib/v2/http-strip.ts` rewrites the primary provider's
-  OpenAI-chat SSE stream and covers every package.
+  OpenAI-chat SSE stream and covers every package. Both strip echoed IDs and `<dcp-system-reminder>` blocks via the
+  shared patterns in `lib/dcp-tags.ts`, mirroring V1's `experimental.text.complete` handler.
 
 ## Testing
 

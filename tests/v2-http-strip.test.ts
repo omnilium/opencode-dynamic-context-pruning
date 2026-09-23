@@ -109,3 +109,18 @@ test("stripHttpResponseEchoes ignores non-SSE responses", async () => {
 
     assert.equal(await target.response.text(), '{"choices":[{"delta":{"content":"Done @7@"}}]}')
 })
+
+test("stripHttpResponseEchoes drops a reminder block split across SSE frames", async () => {
+    const target = event([
+        chatFrame("Done.\n\n<dcp-system"),
+        chatFrame("-reminder>\nEvaluate the conversation.\n</dcp-system-reminder>"),
+        chatFrame("", "stop"),
+        "data: [DONE]\n\n",
+    ])
+
+    stripHttpResponseEchoes(target, "compact")
+
+    const text = await target.response.text()
+    assert.equal(contentOf(text), "Done.\n\n")
+    assert.doesNotMatch(text, /dcp/)
+})

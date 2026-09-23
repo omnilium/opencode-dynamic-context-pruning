@@ -3,11 +3,10 @@ import type { SessionState, WithParts } from "../state"
 import { isMessageCompacted } from "../state/utils"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
 import type { IdFormat } from "../message-ids"
+import { DCP_PAIRED_TAG_REGEX, DCP_UNPAIRED_TAG_REGEX } from "../dcp-tags"
 
 const SUMMARY_ID_HASH_LENGTH = 16
 const DCP_BLOCK_ID_TAG_REGEX = /(<dcp-message-id(?=[\s>])[^>]*>)b\d+(<\/dcp-message-id>)/g
-const DCP_PAIRED_TAG_REGEX = /<dcp[^>]*>[\s\S]*?<\/dcp[^>]*>/gi
-const DCP_UNPAIRED_TAG_REGEX = /<\/?dcp[^>]*>/gi
 const INJECTED_MESSAGE_ID_SUFFIX_REGEX = /(?<=\n)<dcp-message-id[^>]*>m\d+<\/dcp-message-id>\s*$/
 const HALLUCINATED_PARAMETER_SUFFIX_REGEX = /(?<=\n)m\d+<\/parameter>\s*$/
 const COMPACT_TAG_SUFFIX = /@(?:\d+|b\d+|blocked)@(?:[ \t]+\[(?:low|medium|high)\])?[ \t\r\n]*$/i

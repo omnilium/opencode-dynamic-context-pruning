@@ -1,4 +1,5 @@
 import type { IdFormat } from "../message-ids"
+import { DCP_PAIRED_TAG_REGEX, stripDcpTags } from "../dcp-tags"
 
 type StreamPart = { type: string; id?: string; delta?: string; [key: string]: unknown }
 type GenerateResult = { content: Array<Record<string, unknown>>; [key: string]: unknown }
@@ -21,6 +22,30 @@ const XML_PARAMETER_SUFFIX = /(?:^|\n+)m\d+<\/parameter>[ \t\r\n]*$/
 const TAG_TAIL_CANDIDATE = /(?:^|\n+)@(?:[0-9a-z]+@?(?:[ \t]+\[[a-z]*\]?)?[ \t\r\n]*)?$/i
 const MAX_TAG_TAIL = 40
 
+const DCP_CLOSE_TAG = /<\/dcp[^>]*>/i
+const DCP_PARTIAL_TAG = /^<\/?(?:d(?:c(?:p(?:-[^>]*)?)?)?)?$/i
+
+// Hold from an opening <dcp-...> until its close arrives so an echoed reminder
+// block is dropped whole rather than leaking in part. A trailing partial tag is
+// held too, so a split opening tag is never emitted.
+function dcpHoldStart(buffer: string): number {
+    let hold = buffer.length
+    const openings = /<dcp[^>]*>/gi
+    let match: RegExpExecArray | null
+    while ((match = openings.exec(buffer)) !== null) {
+        const after = buffer.slice(match.index + match[0].length)
+        if (!DCP_CLOSE_TAG.test(after)) {
+            hold = match.index
+            break
+        }
+    }
+    const lastOpen = buffer.lastIndexOf("<")
+    if (lastOpen !== -1 && lastOpen < hold && DCP_PARTIAL_TAG.test(buffer.slice(lastOpen))) {
+        hold = lastOpen
+    }
+    return hold
+}
+
 export function stripTrailingTag(text: string, format: IdFormat = "compact"): string {
     if (format === "compact") {
         return text.replace(COMPACT_TAG_SUFFIX, "")
@@ -29,11 +54,12 @@ export function stripTrailingTag(text: string, format: IdFormat = "compact"): st
 }
 
 function safeEmitLength(buffer: string): number {
+    let hold = buffer.length
     const match = buffer.match(TAG_TAIL_CANDIDATE)
-    if (!match || match.index === undefined || buffer.length - match.index > MAX_TAG_TAIL) {
-        return buffer.length
+    if (match && match.index !== undefined && buffer.length - match.index <= MAX_TAG_TAIL) {
+        hold = match.index
     }
-    return match.index
+    return Math.min(hold, dcpHoldStart(buffer))
 }
 
 export interface DeltaStripper {
@@ -49,7 +75,7 @@ export function createDeltaStripper(format: IdFormat = "compact"): DeltaStripper
 
     return {
         push(id, delta) {
-            const buffer = (buffers.get(id) ?? "") + delta
+            const buffer = ((buffers.get(id) ?? "") + delta).replace(DCP_PAIRED_TAG_REGEX, "")
             const emit = safeEmitLength(buffer)
             buffers.set(id, buffer.slice(emit))
             return buffer.slice(0, emit)
@@ -57,12 +83,12 @@ export function createDeltaStripper(format: IdFormat = "compact"): DeltaStripper
         end(id) {
             const buffer = buffers.get(id) ?? ""
             buffers.delete(id)
-            return stripTrailingTag(buffer, format)
+            return stripTrailingTag(stripDcpTags(buffer), format)
         },
         flush() {
             const remaining: Array<{ id: string; delta: string }> = []
             for (const [id, buffer] of buffers) {
-                const stripped = stripTrailingTag(buffer, format)
+                const stripped = stripTrailingTag(stripDcpTags(buffer), format)
                 if (stripped.length > 0) {
                     remaining.push({ id, delta: stripped })
                 }
@@ -149,7 +175,7 @@ export function stripLanguageModel<T extends object>(model: T, format: IdFormat 
             ...result,
             content: result.content.map((part) =>
                 part.type === "text" && typeof part.text === "string"
-                    ? { ...part, text: stripTrailingTag(part.text, format) }
+                    ? { ...part, text: stripTrailingTag(stripDcpTags(part.text), format) }
                     : part,
             ),
         }
